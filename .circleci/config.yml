@@ -1,56 +1,41 @@
 version: 2.1
 
-executors:
-  python-executor:
-    docker:
-      - image: circleci/python:3.9  # Use a CircleCI Python Docker image
-    working_directory: ~/repo
-
 jobs:
-  install_dependencies:
-    executor: python-executor
+  build:
+    docker:
+      - image: circleci/python:3.8  # You can adjust the Python version if needed
+
     steps:
       - checkout
+
       - run:
-          name: Install dependencies
+          name: Install Python and pip
           command: |
             python -m venv venv
             . venv/bin/activate
             pip install --upgrade pip
+
+      - run:
+          name: Install dependencies
+          command: |
+            . venv/bin/activate
             pip install -r requirements.txt
 
-  run_tests:
-    executor: python-executor
-    steps:
-      - checkout
-      - run:
-          name: Run tests
-          command: |
-            . venv/bin/activate
+      # Optional: If you want to skip tests, you can comment this out
+      # - run:
+      #     name: Run tests
+      #     command: |
+      #       . venv/bin/activate
       #       pytest
 
-  deploy:
-    executor: python-executor
-    steps:
-      - checkout
       - run:
-          name: Deploy to Railway
+          name: Deploy
           command: |
             . venv/bin/activate
-            # Add any necessary Railway deployment commands here
-            railway up
+            # Add your deployment commands here
 
 workflows:
   version: 2
-  test_and_deploy:
+  build_and_deploy:
     jobs:
-      - install_dependencies
-      - run_tests:
-          requires:
-            - install_dependencies
-      - deploy:
-          requires:
-            - run_tests
-          filters:
-            branches:
-              only: main
+      - build
