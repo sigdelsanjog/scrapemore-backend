@@ -53,10 +53,10 @@ typing_extensions==4.12.2
 tzdata==2024.1
 ujson==5.10.0
 urllib3==2.2.2
-uvicorn==0.30.6
+uvicorn[standard]
 uvloop==0.20.0
 watchfiles==0.23.0
-webdriver-manager==4.0.2
+webdriver-manager
 websocket-client==1.8.0
 websockets==12.0
 wsproto==1.2.0

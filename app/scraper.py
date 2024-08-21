@@ -23,12 +23,10 @@ async def fetch_links(url: str) -> List[str]:
     options.add_argument("--headless")  # Run in headless mode
     options.add_argument("--no-sandbox")  # Disable sandboxing for headless environments
     options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
-    options.add_argument("--disable-gpu")  # Disable GPU acceleration (recommended for headless)
-    options.add_argument("--remote-debugging-port=9222")  # Ensure debugging port is available
 
     # Set up ChromeDriver
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service= service, options=options)
+    # service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(options=options)
 
     driver.get(url)
     soup = BeautifulSoup(driver.page_source, 'html.parser')
