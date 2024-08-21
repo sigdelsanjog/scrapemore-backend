@@ -3,6 +3,7 @@ from typing import List, Dict
 from bs4 import BeautifulSoup
 import httpx
 from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from urllib.parse import urlparse
@@ -26,7 +27,8 @@ async def fetch_links(url: str) -> List[str]:
     options.add_argument("--remote-debugging-port=9222")  # Ensure debugging port is available
 
     # Set up ChromeDriver
-    driver = webdriver.Chrome(options=options)
+    service = Service(ChromeDriverManager().install())
+    driver = webdriver.Chrome(service= service, options=options)
 
     driver.get(url)
     soup = BeautifulSoup(driver.page_source, 'html.parser')
