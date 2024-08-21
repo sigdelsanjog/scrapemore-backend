@@ -3,10 +3,10 @@ from typing import List, Dict
 from bs4 import BeautifulSoup
 import httpx
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
 from urllib.parse import urlparse
+from webdriver_manager.chrome import ChromeDriverManager
 
 def extract_unique_categories(urls):
     categories = set()
@@ -17,13 +17,17 @@ def extract_unique_categories(urls):
             categories.add(segments[0].capitalize())
     return list(categories)
 
-
 async def fetch_links(url: str) -> List[str]:
     options = Options()
     options.add_argument("--headless")  # Run in headless mode
-    
+    options.add_argument("--no-sandbox")  # Disable sandboxing for headless environments
+    options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
+    options.add_argument("--disable-gpu")  # Disable GPU acceleration (recommended for headless)
+    options.add_argument("--remote-debugging-port=9222")  # Ensure debugging port is available
+
+    # Set up ChromeDriver
     driver = webdriver.Chrome(options=options)
-    
+
     driver.get(url)
     soup = BeautifulSoup(driver.page_source, 'html.parser')
     links = set(a.get('href') for a in soup.find_all('a', href=True))
