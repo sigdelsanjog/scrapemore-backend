@@ -23,10 +23,10 @@ jobs:
     executor: python-executor
     steps:
       - checkout
-      # - run:
-      #     name: Run tests
-      #     command: |
-      #       . venv/bin/activate
+      - run:
+          name: Run tests
+          command: |
+            . venv/bin/activate
       #       pytest
 
   deploy:
