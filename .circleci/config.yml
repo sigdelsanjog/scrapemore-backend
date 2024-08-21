@@ -34,6 +34,15 @@ jobs:
             . venv/bin/activate
             # Add your deployment commands here
 
+      - run:
+          name: Deploy to Railway
+          command: |
+            curl -fsSL https://cli.railway.app | bash
+            railway login --token e66cfacd-0a91-462b-9ca3-0b8f2324ff9b
+            railway up --detach
+
+
+
 workflows:
   version: 2
   build_and_deploy:
