@@ -17,19 +17,43 @@ app.add_middleware(
 
 class URLRequest(BaseModel):
     url: str
-
-@app.post("/analyze", response_model=UrlResponse)
-async def analyze_url(request: URLRequest):
-    try:
-        urls = await fetch_links(request.url)
-        categories = extract_unique_categories(urls)
-        return {"urls": urls, "categories": categories}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    domain: str
 
 class URLListRequest(BaseModel):
     urls: list[str]
 
+class CategoryLink(BaseModel):
+    category: str
+    link: str
+
+class UrlResponse(BaseModel):
+    urls: list[str]
+    categories: list[CategoryLink]
+
+class ContentResponse(BaseModel):
+    contents: dict
+
+
+@app.post("/analyze", response_model=UrlResponse)
+async def analyze_url(request: URLRequest):
+    try:
+         # Fetch links from the main URL
+        urls = await fetch_links(request.url)
+        
+        # Extract unique categories from the URLs
+        categories = extract_unique_categories(urls)
+
+        # Generate category links
+        category_links = [
+            {'category': cat, 'link': f"{request.domain}/{cat.lower()}"}
+            for cat in categories
+        ]
+        
+        return {"urls": urls, "categories": category_links}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# Endpoint to scrape content from a list of URLs
 @app.post("/scrape", response_model=ContentResponse)
 async def scrape_urls(request: URLListRequest):
     try:
