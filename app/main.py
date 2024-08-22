@@ -1,6 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from urllib.parse import urlparse
 from app.scraper import fetch_links, scrape_content, extract_unique_categories
 from app.schemas import UrlResponse, ContentResponse
 
@@ -17,7 +18,6 @@ app.add_middleware(
 
 class URLRequest(BaseModel):
     url: str
-    domain: str
 
 class URLListRequest(BaseModel):
     urls: list[str]
@@ -37,6 +37,10 @@ class ContentResponse(BaseModel):
 @app.post("/analyze", response_model=UrlResponse)
 async def analyze_url(request: URLRequest):
     try:
+         # Parse the domain from the provided URL
+        parsed_url = urlparse(request.url)
+        domain = f"{parsed_url.scheme}://{parsed_url.netloc}"
+
          # Fetch links from the main URL
         urls = await fetch_links(request.url)
         
@@ -45,15 +49,15 @@ async def analyze_url(request: URLRequest):
 
         # Generate category links
         category_links = [
-            {'category': cat, 'link': f"{request.domain}/{cat.lower()}"}
+            {'category': cat, 'link': f"{domain}/{cat.lower()}"}
             for cat in categories
         ]
         
+        # return {"urls": urls, "categories": category_links}
         return {"urls": urls, "categories": category_links}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# Endpoint to scrape content from a list of URLs
 @app.post("/scrape", response_model=ContentResponse)
 async def scrape_urls(request: URLListRequest):
     try:
