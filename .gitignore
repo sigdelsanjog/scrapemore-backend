@@ -16,3 +16,4 @@
 backend/venv/
 __pycache__
 *.pyc
+output.log

@@ -8,6 +8,72 @@ from selenium.webdriver.chrome.options import Options
 from urllib.parse import urlparse
 from webdriver_manager.chrome import ChromeDriverManager
 import re
+from typing import List, Dict
+
+def extract_pages(urls: List[str]) -> List[Dict[str, str]]:
+    pages = []
+    page_pattern = re.compile(r'/pages?(/|$)', re.IGNORECASE)
+    
+    for url in urls:
+        parsed_url = urlparse(url)
+        path = parsed_url.path
+        if page_pattern.search(path):
+            segments = path.strip('/').split('/')
+            if len(segments) > 1 and segments[0].lower() in ['page', 'pages']:
+                page_number = segments[1]
+                if page_number.isdigit() and int(page_number) <= 100:
+                    pages.append({
+                        'category': 'Pages',
+                        'link': f"{parsed_url.scheme}://{parsed_url.netloc}{path}"
+                    })
+    
+    return pages
+
+def extract_tags(urls: List[str]) -> List[Dict[str, str]]:
+    tags = []
+    tag_pattern = re.compile(r'/tags?(/|$)', re.IGNORECASE)
+
+    for url in urls:
+        parsed_url = urlparse(url)
+        path = parsed_url.path
+        if tag_pattern.search(path):
+            segments = path.strip('/').split('/')
+            if len(segments) > 1:
+                tag_name = segments[1]
+                tags.append({
+                    'category': 'Tag',
+                    'link': f"{parsed_url.scheme}://{parsed_url.netloc}/{segments[0]}/{tag_name}"
+                })
+
+    return tags
+
+def extract_years(urls: List[str]) -> List[Dict[str, str]]:
+    years = []
+    year_pattern = re.compile(r'/\d{4}(/|$)')
+
+    for url in urls:
+        parsed_url = urlparse(url)
+        path = parsed_url.path
+        match = year_pattern.search(path)
+        if match:
+            year_segment = match.group().strip('/')
+            years.append({
+                'category': year_segment,
+                'link': f"{parsed_url.scheme}://{parsed_url.netloc}{path}"
+            })
+
+    return years
+
+def analyze_patterns(urls: List[str]) -> Dict[str, List[Dict[str, str]]]:
+    results = {
+        'Pages': extract_pages(urls),
+        'Tags': extract_tags(urls),
+        'Years': extract_years(urls),
+    }
+
+    return results
+
+
 
 def extract_unique_categories(urls: List[str]) -> List[Dict[str, str]]:
     categories = set()
