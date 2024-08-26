@@ -1,120 +1,24 @@
-import asyncio
-from typing import List, Dict
+from typing import List, Dict, Set
 from bs4 import BeautifulSoup
 import httpx
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 from webdriver_manager.chrome import ChromeDriverManager
 import re
-from typing import List, Dict
-
-def extract_pages(urls: List[str]) -> List[Dict[str, str]]:
-    pages = []
-    page_pattern = re.compile(r'/pages?(/|$)', re.IGNORECASE)
-    
-    for url in urls:
-        parsed_url = urlparse(url)
-        path = parsed_url.path
-        if page_pattern.search(path):
-            segments = path.strip('/').split('/')
-            if len(segments) > 1 and segments[0].lower() in ['page', 'pages']:
-                page_number = segments[1]
-                if page_number.isdigit() and int(page_number) <= 100:
-                    pages.append({
-                        'category': 'Pages',
-                        'link': f"{parsed_url.scheme}://{parsed_url.netloc}{path}"
-                    })
-    
-    return pages
-
-def extract_tags(urls: List[str]) -> List[Dict[str, str]]:
-    tags = []
-    tag_pattern = re.compile(r'/tags?(/|$)', re.IGNORECASE)
-
-    for url in urls:
-        parsed_url = urlparse(url)
-        path = parsed_url.path
-        if tag_pattern.search(path):
-            segments = path.strip('/').split('/')
-            if len(segments) > 1:
-                tag_name = segments[1]
-                tags.append({
-                    'category': 'Tag',
-                    'link': f"{parsed_url.scheme}://{parsed_url.netloc}/{segments[0]}/{tag_name}"
-                })
-
-    return tags
-
-def extract_years(urls: List[str]) -> List[Dict[str, str]]:
-    years = []
-    year_pattern = re.compile(r'/\d{4}(/|$)')
-
-    for url in urls:
-        parsed_url = urlparse(url)
-        path = parsed_url.path
-        match = year_pattern.search(path)
-        if match:
-            year_segment = match.group().strip('/')
-            years.append({
-                'category': year_segment,
-                'link': f"{parsed_url.scheme}://{parsed_url.netloc}{path}"
-            })
-
-    return years
-
-def analyze_patterns(urls: List[str]) -> Dict[str, List[Dict[str, str]]]:
-    results = {
-        'Pages': extract_pages(urls),
-        'Tags': extract_tags(urls),
-        'Years': extract_years(urls),
-    }
-
-    return results
+import asyncio
+import logging
+import csv
+from fastapi.responses import FileResponse
+from pathlib import Path
 
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def extract_unique_categories(urls: List[str]) -> List[Dict[str, str]]:
-    categories = set()
-    for url in urls:
-        path = urlparse(url).path
-        segments = path.strip('/').split('/')
-        for segment in segments:
-            words = segment.split('-')
-            # Include segments with one or two words
-            if 1 <= len(words) <= 2:
-                categories.add(segment.lower())
-
-    # Assuming the domain should be derived from the URLs provided
-    if urls:
-        domain = urlparse(urls[0]).scheme + "://" + urlparse(urls[0]).netloc
-    else:
-        domain = ""
-
-    return [{'category': cat.capitalize(), 'link': f"{domain}/{cat.lower()}"} for cat in categories]
-
-
-def extract_unique_pages(urls: List[str]) -> List[Dict[str, str]]:
-    pages = []
-    page_pattern = re.compile(r'/pages?(/|$)', re.IGNORECASE)
-    
-    for url in urls:
-        path = urlparse(url).path
-        if page_pattern.search(path):
-            segments = path.strip('/').split('/')
-            if len(segments) > 1 and segments[0].lower() in ['page', 'pages']:
-                page_number = segments[1]
-                if page_number.isdigit() and int(page_number) <= 100:
-                    pages.append({
-                        'category': f"{segments[0].capitalize()} {page_number}",
-                        'link': f"{urlparse(url).scheme}://{urlparse(url).netloc}{path}"
-                    })
-    
-    return pages
-
-
-async def fetch_links(url: str) -> List[str]:
+def get_chrome_driver() -> webdriver.Chrome:
     options = Options()
     options.add_argument("--headless")  # Run in headless mode
     options.add_argument("--no-sandbox")  # Disable sandboxing for headless environments
@@ -122,18 +26,126 @@ async def fetch_links(url: str) -> List[str]:
 
     # Set up ChromeDriver
     driver = webdriver.Chrome(options=options)
+    return driver
 
-    driver.get(url)
-    soup = BeautifulSoup(driver.page_source, 'html.parser')
-    links = set(a.get('href') for a in soup.find_all('a', href=True))
-    
-    driver.quit()
-    
-    return list(links)
+async def fetch_links(url: str) -> List[str]:
+    driver = get_chrome_driver()
+    try:
+        logger.info(f"Fetching page: {url}")
+        driver.get(url)
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+
+        # Extract and normalize all links from the page
+        base_url = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
+        links = set(urljoin(base_url, a['href']) for a in soup.find_all('a', href=True))
+
+        # Log each found link
+        for link in links:
+            logger.info(f"Found link: {link}")
+
+        # Initialize sets to store unique URLs
+        all_urls = set(links)
+        pages = extract_unique_pages(all_urls)
+        tags = extract_unique_tags(all_urls)
+        categories = extract_unique_categories(all_urls)
+        
+        # Recursively explore pages, tags, and categories
+        for page in pages:
+            sub_links = await explore_sub_links(page['link'])
+            all_urls.update(sub_links)
+
+        for tag in tags:
+            sub_links = await explore_sub_links(tag['link'])
+            all_urls.update(sub_links)
+
+        for category in categories:
+            sub_links = await explore_sub_links(category['link'])
+            all_urls.update(sub_links)
+
+        logger.info(f"Completed fetching links from: {url}")
+        
+    finally:
+        driver.quit()
+
+    return list(all_urls)
+
+async def explore_sub_links(url: str) -> Set[str]:
+    driver = get_chrome_driver()
+    """Explore sub-links under a given URL (e.g., pages, tags, categories)."""
+    try:
+        logger.info(f"Exploring sub-links for: {url}")
+        driver.get(url)
+        soup = BeautifulSoup(driver.page_source, 'html.parser')
+
+        base_url = f"{urlparse(url).scheme}://{urlparse(url).netloc}"
+        sub_links = set(urljoin(base_url, a['href']) for a in soup.find_all('a', href=True))
+
+        # Log each found sub-link
+        for link in sub_links:
+            logger.info(f"Found sub-link: {link}")
+    finally:
+        driver.quit()
+
+    return sub_links
+
+def extract_unique_pages(urls: Set[str]) -> List[Dict[str, str]]:
+    """Extract URLs with pagination."""
+    pages = []
+    page_pattern = re.compile(r'/pages?(/|$)', re.IGNORECASE)
+
+    for url in urls:
+        path = urlparse(url).path
+        if page_pattern.search(path):
+            segments = path.strip('/').split('/')
+            if len(segments) > 1 and segments[0] in ['page', 'pages']:
+                page_number = segments[1]
+                if page_number.isdigit() and int(page_number) <= 100:
+                    pages.append({
+                        'category': 'Pages',
+                        'link': url
+                    })
+
+    logger.info(f"Extracted pages: {pages}")
+    return pages
+
+def extract_unique_tags(urls: Set[str]) -> List[Dict[str, str]]:
+    """Extract URLs with tags."""
+    tags = []
+    tag_pattern = re.compile(r'/tag/([^/]+)/?', re.IGNORECASE)
+
+    for url in urls:
+        match = tag_pattern.search(urlparse(url).path)
+        if match:
+            tag_name = match.group(1)
+            tags.append({
+                'category': f"Tag: {tag_name.capitalize()}",
+                'link': url
+            })
+
+    logger.info(f"Extracted tags: {tags}")
+    return tags
+
+def extract_unique_categories(urls: Set[str]) -> List[Dict[str, str]]:
+    """Extract URLs with categories."""
+    categories = []
+    category_pattern = re.compile(r'/category/([^/]+)/?', re.IGNORECASE)
+
+    for url in urls:
+        match = category_pattern.search(urlparse(url).path)
+        if match:
+            category_name = match.group(1)
+            categories.append({
+                'category': f"Category: {category_name.capitalize()}",
+                'link': url
+            })
+
+    logger.info(f"Extracted categories: {categories}")
+    return categories
 
 async def scrape_content(urls: List[str]) -> Dict[str, Dict[str, str]]:
     results = {}
     for url in urls:
+        logger.info(f"Scraping content from: {url}")
         response = await httpx.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
         results[url] = {
@@ -141,3 +153,13 @@ async def scrape_content(urls: List[str]) -> Dict[str, Dict[str, str]]:
             'body': soup.body.get_text(strip=True) if soup.body else 'No Content'
         }
     return results
+
+async def write_links_to_csv(links: List[str], filename: str = "unique_links.csv") -> str:
+    """Write the list of links to a CSV file and return the filename."""
+    filepath = Path(filename)
+    with filepath.open(mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["URL"])
+        for link in links:
+            writer.writerow([link])
+    return str(filepath)
