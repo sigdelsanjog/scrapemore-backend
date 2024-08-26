@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 from urllib.parse import urlparse
-from app.scraper import fetch_links, scrape_content, extract_unique_categories, extract_unique_pages, extract_unique_tags
+from app.scraper import fetch_links, scrape_content,write_links_to_csv, extract_unique_categories, extract_unique_pages, extract_unique_tags
 from app.schemas import UrlResponse, ContentResponse
 from typing import List, Dict
 import logging
