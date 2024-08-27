@@ -5,7 +5,7 @@ from urllib.parse import urlparse
 import logging
 import os
 from app.config.models import URLRequest, URLResponse, URLListRequest, ContentResponse
-from app.engine.scraper import fetch_links, scrape_content,write_links_to_csv, extract_unique_categories, extract_unique_pages, extract_unique_tags
+from app.scraper import fetch_links, write_links_to_csv, extract_unique_categories, extract_unique_pages, extract_unique_tags
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,8 +25,9 @@ app.add_middleware(
 @app.post("/analyze", response_model=URLResponse)
 async def analyze_url(request: URLRequest):
     try:
+        visited_links = set()
         # Fetch all unique links from the given URL
-        all_links = await fetch_links(request.url)
+        all_links = await fetch_links(request.url, visited_links)
 
         # Categorize the links into Pages, Tags, and Categories
         pages = [link['link'] for link in extract_unique_pages(all_links)]
@@ -51,9 +52,10 @@ async def analyze_url(request: URLRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/scrape-links/")
-async def scrape_links(url: str, background_tasks: BackgroundTasks):
-    links = await fetch_links(url)
-    
+async def scrape_links(request: URLRequest, background_tasks: BackgroundTasks):
+    visited_links = set()
+    links = await fetch_links(request.url, visited_links)
+
     # Write the links to a CSV file
     csv_file_path = await write_links_to_csv(links)
 

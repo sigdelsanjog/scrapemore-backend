@@ -1,8 +1,6 @@
 from typing import List, Dict, Set
 from bs4 import BeautifulSoup
 import httpx
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from urllib.parse import urljoin, urlparse
 import re
 import logging
@@ -15,8 +13,13 @@ from app.config.driver import get_chrome_driver
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-async def fetch_links(url: str) -> List[str]:
+async def fetch_links(url: str, visited_links: Set[str]) -> List[str]:
+    if url in visited_links:
+        return []
+    
+    visited_links.add(url)
     driver = get_chrome_driver()
+
     try:
         logger.info(f"Fetching page: {url}")
         driver.get(url)
@@ -38,25 +41,32 @@ async def fetch_links(url: str) -> List[str]:
         
         # Recursively explore pages, tags, and categories
         for page in pages:
-            sub_links = await explore_sub_links(page['link'])
+            sub_links = await explore_sub_links(page['link'], visited_links)
             all_urls.update(sub_links)
 
         for tag in tags:
-            sub_links = await explore_sub_links(tag['link'])
+            sub_links = await explore_sub_links(tag['link'], visited_links)
             all_urls.update(sub_links)
 
         for category in categories:
-            sub_links = await explore_sub_links(category['link'])
+            sub_links = await explore_sub_links(category['link'], visited_links)
             all_urls.update(sub_links)
 
         logger.info(f"Completed fetching links from: {url}")
+        
+    except Exception as e:
+        logger.error(f"Error fetching {url}: {e}")
         
     finally:
         driver.quit()
 
     return list(all_urls)
 
-async def explore_sub_links(url: str) -> Set[str]:
+async def explore_sub_links(url: str, visited_links: Set[str]) -> Set[str]:
+    if url in visited_links:
+        return set()
+    
+    visited_links.add(url)
     driver = get_chrome_driver()
     """Explore sub-links under a given URL (e.g., pages, tags, categories)."""
     try:
