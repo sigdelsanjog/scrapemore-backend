@@ -15,7 +15,8 @@ logger = logging.getLogger(__name__)
 
 async def fetch_links(url: str, visited_links: Set[str]) -> List[str]:
     if url in visited_links:
-        return []
+         logger.info(f"Skipped fetching page (already visited): {url}")
+         return []
     
     visited_links.add(url)
     driver = get_chrome_driver()
@@ -64,7 +65,8 @@ async def fetch_links(url: str, visited_links: Set[str]) -> List[str]:
 
 async def explore_sub_links(url: str, visited_links: Set[str]) -> Set[str]:
     if url in visited_links:
-        return set()
+      logger.info(f"Skipped exploring sub-links (already visited): {url}")
+      return set()
     
     visited_links.add(url)
     driver = get_chrome_driver()
