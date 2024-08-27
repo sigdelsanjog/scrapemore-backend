@@ -2,10 +2,8 @@ from typing import List, Dict, Set
 from bs4 import BeautifulSoup
 import httpx
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from urllib.parse import urljoin, urlparse
-from webdriver_manager.chrome import ChromeDriverManager
 import re
 import asyncio
 import logging

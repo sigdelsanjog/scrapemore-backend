@@ -1,13 +1,11 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
 from urllib.parse import urlparse
-from app.scraper import fetch_links, scrape_content,write_links_to_csv, extract_unique_categories, extract_unique_pages, extract_unique_tags
-from app.schemas import UrlResponse, ContentResponse
-from typing import List, Dict
 import logging
 import os
+from app.config.models import URLRequest, URLResponse, URLListRequest, ContentResponse
+from app.engine.scraper import fetch_links, scrape_content,write_links_to_csv, extract_unique_categories, extract_unique_pages, extract_unique_tags
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -24,23 +22,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class URLRequest(BaseModel):
-    url: str
-
-class URLCategory(BaseModel):
-    category: str
-    urls: list[str]
-
-class UrlResponse(BaseModel):
-    urls: list[URLCategory]
-
-class URLListRequest(BaseModel):
-    urls: list[str]
-
-class ContentResponse(BaseModel):
-    contents: dict
-
-@app.post("/analyze", response_model=UrlResponse)
+@app.post("/analyze", response_model=URLResponse)
 async def analyze_url(request: URLRequest):
     try:
         # Fetch all unique links from the given URL
