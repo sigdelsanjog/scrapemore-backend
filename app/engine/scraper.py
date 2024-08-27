@@ -5,26 +5,15 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from urllib.parse import urljoin, urlparse
 import re
-import asyncio
 import logging
 import csv
-from fastapi.responses import FileResponse
 from pathlib import Path
 
+from app.config.driver import get_chrome_driver
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-def get_chrome_driver() -> webdriver.Chrome:
-    options = Options()
-    options.add_argument("--headless")  # Run in headless mode
-    options.add_argument("--no-sandbox")  # Disable sandboxing for headless environments
-    options.add_argument("--disable-dev-shm-usage")  # Overcome limited resource problems
-
-    # Set up ChromeDriver
-    driver = webdriver.Chrome(options=options)
-    return driver
 
 async def fetch_links(url: str) -> List[str]:
     driver = get_chrome_driver()
