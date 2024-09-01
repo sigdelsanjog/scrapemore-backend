@@ -1,11 +1,11 @@
+# main.py
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
-from urllib.parse import urlparse
+from app.config.models import URLRequest, URLResponse
+from app.scraper import fetch_links, write_links_to_csv, extract_unique_categories, extract_unique_pages, extract_unique_tags
 import logging
 import os
-from app.config.models import URLRequest, URLResponse, URLListRequest, ContentResponse
-from app.scraper import fetch_links, write_links_to_csv, extract_unique_categories, extract_unique_pages, extract_unique_tags
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -26,29 +26,33 @@ app.add_middleware(
 async def analyze_url(request: URLRequest):
     try:
         visited_links = set()
-        # Fetch all unique links from the given URL
         all_links = await fetch_links(request.url, visited_links)
 
         # Categorize the links into Pages, Tags, and Categories
-        pages = [link['link'] for link in extract_unique_pages(all_links)]
-        tags = [link['link'] for link in extract_unique_tags(all_links)]
-        categories = [link['link'] for link in extract_unique_categories(all_links)]
+        pages = extract_unique_pages(all_links)
+        tags = extract_unique_tags(all_links)
+        categories = extract_unique_categories(all_links)
 
-        # Log each URL category as it is processed
-        logger.info(f"Pages: {pages}")
-        logger.info(f"Tags: {tags}")
-        logger.info(f"Categories: {categories}")
+        # Prepare a flat list of URLs for response
+        response_urls = []
+
+        # Flatten the categories, pages, and tags into individual URL entries
+        for page in pages:
+            response_urls.append({"category": "Page", "url": page['link']})
         
-        # Prepare the response structure
-        response = [
-            {"category": "Pages", "urls": pages},
-            {"category": "Tags", "urls": tags},
-            {"category": "Categories", "urls": categories},
-        ]
+        for tag in tags:
+            response_urls.append({"category": tag['category'], "url": tag['link']})
+        
+        for category in categories:
+            response_urls.append({"category": category['category'], "url": category['link']})
 
-        return {"urls": response}
+        # Log the prepared response
+        logger.info(f"Prepared response: {response_urls}")
+
+        return {"urls": response_urls}
 
     except Exception as e:
+        logger.error(f"Error in /analyze: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/scrape-links/")
@@ -56,13 +60,10 @@ async def scrape_links(request: URLRequest, background_tasks: BackgroundTasks):
     visited_links = set()
     links = await fetch_links(request.url, visited_links)
 
-    # Write the links to a CSV file
     csv_file_path = await write_links_to_csv(links)
 
-    # Return the CSV file as a downloadable response
     background_tasks.add_task(clean_up_file, csv_file_path)
     return FileResponse(path=csv_file_path, filename="unique_links.csv", media_type="text/csv")
 
 async def clean_up_file(filepath: str):
-    """Delete the file after sending the response."""
     os.remove(filepath)

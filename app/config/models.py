@@ -4,12 +4,12 @@ from typing import List, Dict
 class URLRequest(BaseModel):
     url: str
 
-class URLCategory(BaseModel):
+class URLItem(BaseModel):
     category: str
-    urls: list[str]
+    url: str
 
 class URLResponse(BaseModel):
-    urls: list[URLCategory]
+    urls: list[URLItem]
 
 class URLListRequest(BaseModel):
     urls: list[str]
