@@ -117,7 +117,7 @@ def extract_unique_tags(urls: Set[str]) -> List[Dict[str, str]]:
         if match:
             tag_name = match.group(1)
             tags.append({
-                'category': f"Tag: {tag_name.capitalize()}",
+                'category': f"{tag_name.capitalize()}",
                 'link': url
             })
 
@@ -134,7 +134,7 @@ def extract_unique_categories(urls: Set[str]) -> List[Dict[str, str]]:
         if match:
             category_name = match.group(1)
             categories.append({
-                'category': f"Category: {category_name.capitalize()}",
+                'category': f"{category_name.capitalize()}",
                 'link': url
             })
 
