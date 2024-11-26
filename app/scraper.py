@@ -7,7 +7,7 @@ import logging
 import csv
 from pathlib import Path
 
-from app.config.driver import get_chrome_driver
+from config.driver import get_chrome_driver
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
